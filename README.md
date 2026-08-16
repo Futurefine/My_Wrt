@@ -13,7 +13,7 @@
 ## 固件包含
 
 ### 系统
-- 主题: bootstrap（默认，不会报错）
+- 主题: bootstrap
 - 文件系统: exFAT、VFAT
 - 工具: bash、curl、htop、tcpdump、sftp-server、openssl、xz-utils
 
