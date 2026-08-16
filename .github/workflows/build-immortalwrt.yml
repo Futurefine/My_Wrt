@@ -1,0 +1,88 @@
+name: Build ImmortalWrt
+
+on:
+  workflow_dispatch:
+    inputs:
+      device:
+        description: Device Model
+        required: true
+        default: jdcloud_re-cs-02
+        type: choice
+        options:
+          - jdcloud_re-cs-02
+          - jdcloud_re-ss-01
+          - jdcloud_re-cs-07
+          - redmi_ax5-jdcloud
+
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Free Disk Space
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/share/swift 2>/dev/null || true
+          docker system prune -af || true
+          sudo apt-get autoremove --purge -y || true
+          sudo apt-get clean || true
+          df -hT
+
+      - name: Build System Setup
+        run: |
+          sudo bash -c 'bash <(curl -sL https://build-scripts.immortalwrt.org/init_build_environment.sh)'
+          sudo apt -y install dos2unix
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Clone ImmortalWrt Source
+        run: |
+          git clone --depth=1 https://github.com/laipeng668/immortalwrt.git -b openwrt-25.12
+          cd immortalwrt
+          echo "REPO_HASH=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - name: Update Feeds
+        run: |
+          cd immortalwrt
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      - name: Add OpenClash Feed
+        run: |
+          cd immortalwrt
+          echo "src-git openclash https://github.com/vernesong/OpenClash.git" >> feeds.conf.default
+          ./scripts/feeds update openclash
+          ./scripts/feeds install -a -p openclash
+
+      - name: Configure Firmware
+        run: |
+          cd immortalwrt
+          cp ../seed.config .config
+          make defconfig
+
+      - name: Apply Custom Patches
+        run: |
+          cd immortalwrt
+          # 复制自定义设置脚本到 uci-defaults
+          cp ../patches/99-custom-settings.sh package/base-files/files/etc/uci-defaults/99-custom-settings.sh
+          chmod +x package/base-files/files/etc/uci-defaults/99-custom-settings.sh
+
+      - name: Build Firmware
+        id: build
+        run: |
+          cd immortalwrt
+          make -j$(nproc) || make -j1 V=s
+          echo "BUILD_DATE=$(TZ=UTC-8 date +'%y.%m.%d_%H.%M.%S')" >> $GITHUB_ENV
+          # 收集固件
+          mkdir -p ../firmware
+          find bin/targets -name "*.bin" -exec cp {} ../firmware/ \;
+          ls -lh ../firmware/
+
+      - name: Upload Firmware
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: immortalwrt-${{ inputs.device }}-${{ env.BUILD_DATE }}
+          path: ./firmware/*.bin

@@ -1,0 +1,5 @@
+firmware/
+immortalwrt/
+action_build/
+*.ipk
+*.bin
