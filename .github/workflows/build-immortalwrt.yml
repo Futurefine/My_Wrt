@@ -37,6 +37,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set Build Time
+        run: echo "BUILD_DATE=$(TZ=UTC-8 date +'%y.%m.%d_%H.%M.%S')" >> $GITHUB_ENV
+
       - name: Clone ImmortalWrt Source
         run: |
           git clone --depth=1 https://github.com/laipeng668/immortalwrt.git -b openwrt-25.12
@@ -49,12 +52,16 @@ jobs:
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      - name: Add OpenClash Feed
+      - name: Add Custom Feeds
         run: |
           cd immortalwrt
+          # OpenClash 源
           echo "src-git openclash https://github.com/vernesong/OpenClash.git" >> feeds.conf.default
-          ./scripts/feeds update openclash
+          # iStore 源（应用商店）
+          echo "src-git istore https://github.com/linkease/istore.git" >> feeds.conf.default
+          ./scripts/feeds update openclash istore
           ./scripts/feeds install -a -p openclash
+          ./scripts/feeds install -a -p istore
 
       - name: Configure Firmware
         run: |
@@ -74,7 +81,6 @@ jobs:
         run: |
           cd immortalwrt
           make -j$(nproc) || make -j1 V=s
-          echo "BUILD_DATE=$(TZ=UTC-8 date +'%y.%m.%d_%H.%M.%S')" >> $GITHUB_ENV
           # 收集固件
           mkdir -p ../firmware
           find bin/targets -name "*.bin" -exec cp {} ../firmware/ \;

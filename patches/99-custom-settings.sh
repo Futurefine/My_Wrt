@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# 设置 LAN IP 为 192.168.2.1（避免与家庭光猫/主路由冲突）
+# 设置 LAN IP 为 192.168.3.3（避免与家庭光猫/主路由冲突）
 uci set network.lan.ipaddr='192.168.3.3'
 uci commit network
 
